@@ -1,0 +1,121 @@
+package funct_req_Brawn;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.Scanner;
+public class FlightBookingSystem2 {
+   // ... (other methods and classes)
+   // Method to display flights from the database
+   private static void displayFlightsFromDatabase() {
+       Connection conn = null;
+       try {
+           // Load the SQLite JDBC driver
+           Class.forName("org.sqlite.JDBC");
+           // Database parameters
+           String url = "jdbc:sqlite:C:/Users/15173/Desktop/sqlite.db";
+           // Create a connection to the database
+           conn = DriverManager.getConnection(url);
+           // Enable auto-commit mode
+           conn.setAutoCommit(true);
+           // Prepare SQL statement for selecting all flights
+           String selectFlightsQuery = "SELECT * FROM Flight";
+           try (PreparedStatement pstmt = conn.prepareStatement(selectFlightsQuery)) {
+               // Execute the query
+               try (ResultSet resultSet = pstmt.executeQuery()) {
+                   // Display flight information
+                   while (resultSet.next()) {
+                       String fromCity = resultSet.getString("FromCity");
+                       String toCity = resultSet.getString("ToCity");
+                       String DepartureDateTime = resultSet.getString("DepartureDateTime");
+                       int MaxPassengers = resultSet.getInt("MaxPassengers");
+                       int FlightID = resultSet.getInt("FlightID");
+                       System.out.println("Flight " + FlightID + " from " + fromCity + " to " + toCity +
+                               " departing at " + DepartureDateTime + " with capacity " + MaxPassengers);
+                   }
+               }
+           }
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+       } finally {
+           try {
+               if (conn != null) {
+                   System.out.println("Closing connection");
+                   conn.close();
+               }
+           } catch (SQLException ex) {
+               System.out.println(ex.getMessage());
+           }
+       }
+   }
+   // Method to book a flight
+   private static void bookFlight(int userId, int flightId) {
+       Connection conn = null;
+       try {
+           // Load the SQLite JDBC driver
+           Class.forName("org.sqlite.JDBC");
+           // Database parameters
+           String url = "jdbc:sqlite:C:/Users/15173/Desktop/sqlite.db";
+           // Create a connection to the database
+           conn = DriverManager.getConnection(url);
+           // Enable auto-commit mode
+           conn.setAutoCommit(true);
+           // Check if the flight is available
+           if (isFlightAvailable(conn, flightId)) {
+               // Prepare SQL statement for inserting a new booking
+               String insertBookingQuery = "INSERT INTO Booking (UserID, FlightID, BookingDateTime) VALUES (?, ?, ?)";
+               try (PreparedStatement pstmt = conn.prepareStatement(insertBookingQuery)) {
+                   pstmt.setInt(1, userId);
+                   pstmt.setInt(2, flightId);
+                   pstmt.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
+                   // Execute the insert statement
+                   pstmt.executeUpdate();
+                   System.out.println("Booking successful!");
+               }
+           } else {
+               System.out.println("Flight is not available for booking.");
+           }
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+       } finally {
+           try {
+               if (conn != null) {
+                   System.out.println("Closing connection");
+                   conn.close();
+               }
+           } catch (SQLException ex) {
+               System.out.println(ex.getMessage());
+           }
+       }
+   }
+   // Helper method to check if a flight is available
+   private static boolean isFlightAvailable(Connection conn, int flightId) throws SQLException {
+       // Prepare SQL statement for checking flight availability
+       String checkAvailabilityQuery = "SELECT * FROM Flight WHERE FlightID = ? AND CurrentPassengers < MaxPassengers";
+       try (PreparedStatement pstmt = conn.prepareStatement(checkAvailabilityQuery)) {
+           pstmt.setInt(1, flightId);
+           // Execute the query
+           try (ResultSet resultSet = pstmt.executeQuery()) {
+               return resultSet.next(); // If a row is returned, the flight is available
+           }
+       }
+   }
+   public static void main(String[] args) {
+       // ... (other code)
+       // Display flights from the database
+       displayFlightsFromDatabase();
+       // Example: Booking a flight (Replace with user input as needed)
+       Scanner scanner = new Scanner(System.in);
+       System.out.print("Enter your UserID: ");
+       int userId = scanner.nextInt();
+       System.out.print("Enter the FlightID you want to book: ");
+       int flightId = scanner.nextInt();
+       bookFlight(userId, flightId);
+       scanner.close();
+   }
+}
+
+
+
