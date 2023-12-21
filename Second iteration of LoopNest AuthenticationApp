@@ -1,0 +1,84 @@
+package funct_req_Brawn;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+
+public class Authentication_app {
+    private static final Map<String, String> users = new HashMap<>();
+    public static void main(String[] args) {
+        showSplashScreen();
+        showMainMenu();
+    }
+
+    protected static void showSplashScreen() {
+        System.out.println("Welcome to Authentication App!");
+        System.out.println("Loading...");
+        // Add additional splash screen content if needed
+        System.out.println();
+    }
+
+    protected static void showMainMenu() {
+        Scanner scanner = new Scanner(System.in);
+        int choice;
+
+        do {
+            System.out.println("Main Menu:");
+            System.out.println("1. Register");
+            System.out.println("2. Login");
+            System.out.println("3. Exit");
+            System.out.print("Enter your choice: ");
+
+            choice = scanner.nextInt();
+            scanner.nextLine(); // Consume newline character
+
+            switch (choice) {
+                case 1:
+                    registerUser(scanner);
+                    break;
+                case 2:
+                    loginUser(scanner);
+                    break;
+                case 3:
+                    System.out.println("Exiting the application. Goodbye!");
+                    break;
+                default:
+                    System.out.println("Invalid choice. Please try again.");
+            }
+        } while (choice != 3);
+
+        scanner.close();
+    }
+
+    private static void registerUser(Scanner scanner) {
+        System.out.println("Register a new user:");
+        System.out.print("Enter username: ");
+        String username = scanner.nextLine();
+        if (users.containsKey(username)) {
+            System.out.println("Username already exists. Please choose a different username.");
+        } else {
+            System.out.print("Enter password: ");
+            String password = scanner.nextLine();
+            users.put(username, password);
+            System.out.println("User registered successfully!");
+        }
+        System.out.println();
+    }
+    private static void loginUser(Scanner scanner) {
+        System.out.println("Login:");
+        System.out.print("Enter username: ");
+        String username = scanner.nextLine();
+        if (users.containsKey(username)) {
+            System.out.print("Enter password: ");
+            String password = scanner.nextLine();
+            if (password.equals(users.get(username))) {
+                System.out.println("Login successful! Welcome, " + username + "!");
+            } else {
+                System.out.println("Incorrect password. Please try again.");
+            }
+        } else {
+            System.out.println("Username not found. Please register or check your username.");
+        }
+        System.out.println();
+    }
+ }
