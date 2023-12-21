@@ -1,0 +1,337 @@
+package funct_req_Brawn;
+
+import java.sql.ResultSet;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+
+public class RegistrationLoginRecoverySystem {
+    private interface UserInterface {
+        String getPassword();
+        String getSecurityQuestion();
+        String getSecurityAnswer();
+
+        void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                           String username, String password, String email, String ssn,
+                           String securityQuestion, String securityAnswer, String userType);
+    }
+
+    private static class User implements UserInterface {
+        protected String password;
+        protected String securityQuestion;
+        protected String securityAnswer;
+
+        public User(String firstName, String lastName, String address, String zip, String state,
+                    String username, String password, String email, String ssn,
+                    String securityQuestion, String securityAnswer) {
+            this.password = password;
+            this.securityQuestion = securityQuestion;
+            this.securityAnswer = securityAnswer;
+            addToDatabase(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer, "User");
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public String getSecurityQuestion() {
+            return securityQuestion;
+        }
+
+        public String getSecurityAnswer() {
+            return securityAnswer;
+        }
+
+        @Override
+        public void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                                  String username, String password, String email, String ssn,
+                                  String securityQuestion, String securityAnswer, String userType) {
+            Connection conn = null;
+            try {
+                // Load the PostgreSQL JDBC driver
+                Class.forName("org.postgresql.Driver");
+
+                // Database parameters
+                String url = "jdbc:postgresql://localhost:5432/LoopNest";
+                String user = "postgres";
+                String password1 = "bd199316";
+
+                // Create a connection to the database
+                conn = DriverManager.getConnection(url, user, password1);
+
+                // Enable auto-commit mode
+                conn.setAutoCommit(true);
+
+                // Prepare SQL statement for inserting a new user and retrieving the generated user ID
+                String insertUserQuery = "INSERT INTO LoopNestUser (FirstName, LastName, Address, ZipCode, State, Username, Password, Email, SSN, SecurityQuestion, SecurityAnswer, UserType) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(insertUserQuery, PreparedStatement.RETURN_GENERATED_KEYS)) {
+                    pstmt.setString(1, firstName);
+                    pstmt.setString(2, lastName);
+                    pstmt.setString(3, address);
+                    pstmt.setString(4, zipCode);
+                    pstmt.setString(5, state);
+                    pstmt.setString(6, username);
+                    pstmt.setString(7, password1);
+                    pstmt.setString(8, email);
+                    pstmt.setString(9, ssn);
+                    pstmt.setString(10, securityQuestion);
+                    pstmt.setString(11, securityAnswer);  // Populate the SecurityAnswer column
+
+                    // Update the UserType value
+                    pstmt.setString(12, userType);
+
+                    // Execute the insert statement
+                    pstmt.executeUpdate();
+
+                    // Retrieve the generated user ID
+                    int userId = displayUserID(conn, username);
+                    if (userId != -1) {
+                        System.out.println("User ID: " + userId);
+                        System.out.println("Registration Successful!");
+                    } else {
+                        System.out.println("Failed to retrieve user ID. User registration may not be successful.");
+                    }
+                }
+            } catch (ClassNotFoundException | SQLException e) {
+                System.out.println(e.getMessage());
+            } finally {
+                try {
+                    if (conn != null) {
+                        System.out.println("Closing connection");
+                        conn.close();
+                    }
+                } catch (SQLException ex) {
+                    System.out.println(ex.getMessage());
+                }
+            }
+        }
+    }
+
+    private static class Customer extends User {
+        public Customer(String firstName, String lastName, String address, String zip, String state,
+                        String username, String password, String email, String ssn,
+                        String securityQuestion, String securityAnswer) {
+            super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        }
+    }
+
+    private static class Admin extends User {
+        public Admin(String firstName, String lastName, String address, String zip, String state,
+                     String username, String password, String email, String ssn,
+                     String securityQuestion, String securityAnswer) {
+            super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        }
+    }
+
+    private static Map<String, UserInterface> registeredUsers = new HashMap<>();
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        
+        // Registration
+        registerUser(scanner);
+
+        // Login
+        loginUser(scanner);
+
+        // Password Recovery
+        passwordRecovery(scanner);
+       
+    }
+
+    protected static void registerUser(Scanner scanner) {
+        System.out.println("Registration:");
+
+        System.out.print("Enter First Name: ");
+        String firstName = scanner.nextLine();
+
+        System.out.print("Enter Last Name: ");
+        String lastName = scanner.nextLine();
+
+        System.out.print("Enter Address: ");
+        String address = scanner.nextLine();
+
+        System.out.print("Enter Zip Code: ");
+        String zipCode = scanner.nextLine();
+
+        System.out.print("Enter State: ");
+        String state = scanner.nextLine();
+
+        System.out.print("Enter Username: ");
+        String username = scanner.nextLine();
+
+        System.out.print("Enter Password: ");
+        String password = scanner.nextLine();
+
+        System.out.print("Enter Email: ");
+        String email = scanner.nextLine();
+
+        System.out.print("Enter SSN: ");
+        String ssn = scanner.nextLine();
+
+        System.out.print("Enter Security Question: ");
+        String securityQuestion = scanner.nextLine();
+
+        System.out.print("Enter Security Answer: ");
+        String securityAnswer = scanner.nextLine();
+
+        System.out.print("Is this a Customer or Admin account? (Enter 1 for Customer or 2 for Admin) ");
+        int choice2 = scanner.nextInt();
+        scanner.nextLine(); // Consume the newline character
+
+        // Create a UserInterface reference
+        UserInterface newUser;
+
+        if (choice2 == 1) {
+            // Create a Customer object
+            newUser = new Customer(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        } else if (choice2 == 2) {
+            // Create an Admin object
+            newUser = new Admin(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        } else {
+            // Handle invalid choice
+            System.out.println("Invalid choice. User registration failed.");
+            return;
+        }
+
+        // Add the user to the map (for future reference, if needed)
+        registeredUsers.put(username, newUser);
+
+        // Populate the database
+        newUser.addToDatabase(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer, (choice2 == 1) ? "Customer" : "Admin");
+
+        System.out.println("User registered successfully!");
+    }
+    
+   protected static void loginUser(Scanner scanner) {
+       System.out.println("\nLogin:");
+       System.out.print("Enter Username: ");
+       String loginUsername = scanner.nextLine();
+       System.out.print("Enter Password: ");
+       String loginPassword = scanner.nextLine();
+       // Check the database for the username and password
+       if (checkUserCredentials(loginUsername, loginPassword)) {
+           System.out.println("Login successful!");
+       } else {
+           System.out.println("Invalid username or password. Login failed.");
+       }
+   }
+   private static boolean checkUserCredentials(String username, String password) {
+       Connection conn = null;
+       try {
+           // Load the PostgreSQL JDBC driver
+           Class.forName("org.postgresql.Driver");
+           // Database parameters
+           String url = "jdbc:postgresql://localhost:5432/LoopNest";
+           String user = "postgres";
+           String password1 = "bd199316";
+
+           // Create a connection to the database
+           conn = DriverManager.getConnection(url, user, password1);
+           // Enable auto-commit mode
+           conn.setAutoCommit(true);
+           // Prepare SQL statement for checking user credentials
+           String checkCredentialsQuery = "SELECT * FROM LoopNestUser WHERE Username = ? AND Password = ?";
+           try (PreparedStatement pstmt = conn.prepareStatement(checkCredentialsQuery)) {
+               pstmt.setString(1, username);
+               pstmt.setString(2, password1);
+               // Execute the query
+               try (ResultSet resultSet = pstmt.executeQuery()) {
+                   return resultSet.next(); // If a row is returned, credentials are valid
+               }
+           }
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+           return false;
+       } finally {
+           try {
+               if (conn != null) {
+                   System.out.println("Closing connection");
+                   conn.close();
+               }
+           } catch (SQLException ex) {
+               System.out.println(ex.getMessage());
+           }
+       }
+   }
+   protected static void passwordRecovery(Scanner scanner) {
+       System.out.println("\nPassword Recovery:");
+       System.out.print("Enter Username: ");
+       String recoveryUsername = scanner.nextLine();
+       Connection conn = null;
+       try {
+           // Load the PostgreSQL JDBC driver
+           Class.forName("org.postgresql.Driver");
+           // Database parameters
+           String url = "jdbc:postgresql://localhost:5432/LoopNest";
+           String user = "postgres";
+           String password = "bd199316";
+
+           // Create a connection to the database
+           conn = DriverManager.getConnection(url, user, password);
+           // Enable auto-commit mode
+           conn.setAutoCommit(true);
+           // Prepare SQL statement for retrieving the user's password
+           String selectUserQuery = "SELECT Password, SecurityQuestion, SecurityAnswer FROM LoopNestUser WHERE Username = ?";
+           try (PreparedStatement pstmt = conn.prepareStatement(selectUserQuery)) {
+               pstmt.setString(1, recoveryUsername);
+               // Execute the query
+               try (ResultSet resultSet = pstmt.executeQuery()) {
+                   if (resultSet.next()) {
+                       // User found in the database
+                       String storedPassword = resultSet.getString("Password");
+                       String storedSecurityQuestion = resultSet.getString("SecurityQuestion");
+                       String storedSecurityAnswer = resultSet.getString("SecurityAnswer");
+                       // Display security question
+                       System.out.println("Security Question: " + storedSecurityQuestion);
+                       // Prompt for security answer
+                       System.out.print("Enter Security Answer: ");
+                       String userPasswordRecoveryInput = scanner.nextLine();
+                       // Check if the provided security answer matches the stored answer
+                       if (storedSecurityAnswer.equalsIgnoreCase(userPasswordRecoveryInput)) {
+                           // Display the retrieved password
+                           System.out.println("Your Password is: " + storedPassword);
+                       } else {
+                           System.out.println("Invalid security answer. Password recovery failed.");
+                       }
+                   } else {
+                       System.out.println("Username not found. Password recovery failed.");
+                   }
+               }
+           }
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+       } finally {
+           try {
+               if (conn != null) {
+                   System.out.println("Closing connection");
+                   conn.close();
+               }
+           } catch (SQLException ex) {
+               System.out.println(ex.getMessage());
+           }
+       }
+   }
+private static int displayUserID(Connection conn, String username) throws SQLException {
+    int userId = -1;  // Default value in case user ID retrieval fails
+
+    String selectUserIdQuery = "SELECT UserID FROM LoopNestUser WHERE Username = ?";
+    try (PreparedStatement pstmt = conn.prepareStatement(selectUserIdQuery)) {
+        pstmt.setString(1, username);
+
+        try (ResultSet resultSet = pstmt.executeQuery()) {
+            if (resultSet.next()) {
+                userId = resultSet.getInt("UserID");
+            }
+        }
+    }
+
+    return userId;
+}
+}
+
