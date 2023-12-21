@@ -1,0 +1,193 @@
+package funct_req_Brawn;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+public class RegistrationLoginRecoverySystem {
+   private interface UserInterface {
+       String getPassword();
+       String getSecurityQuestion();
+       String getSecurityAnswer();
+       void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                          String username, String password, String email, String ssn,
+                          String securityQuestion, String securityAnswer, String userType);
+   }
+   private static class User implements UserInterface {
+       protected String password;
+       protected String securityQuestion;
+       protected String securityAnswer;
+       public User(String firstName, String lastName, String address, String zip, String state,
+                   String username, String password, String email, String ssn,
+                   String securityQuestion, String securityAnswer) {
+           this.password = password;
+           this.securityQuestion = securityQuestion;
+           this.securityAnswer = securityAnswer;
+           addToDatabase(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer, "User");
+       }
+       public String getPassword() {
+           return password;
+       }
+       public String getSecurityQuestion() {
+           return securityQuestion;
+       }
+       public String getSecurityAnswer() {
+           return securityAnswer;
+       }
+       @Override
+       public void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                                 String username, String password, String email, String ssn,
+                                 String securityQuestion, String securityAnswer, String userType) {
+           Connection conn = null;
+           try {
+               // Load the SQLite JDBC driver
+               Class.forName("org.sqlite.JDBC");
+               // db parameters
+               String url = "jdbc:sqlite:C:/Users/15173/Desktop/sqlite.db";
+               // create a connection to the database
+               conn = DriverManager.getConnection(url);
+               // Enable auto-commit mode
+               conn.setAutoCommit(true);
+               // Prepare SQL statement for inserting a new user
+               String insertUserQuery = "INSERT INTO User (FirstName, LastName, Address, ZipCode, State, Username, Password, Email, SSN, SecurityQuestion, UserType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+               try (PreparedStatement pstmt = conn.prepareStatement(insertUserQuery)) {
+                   pstmt.setString(1, firstName);
+                   pstmt.setString(2, lastName);
+                   pstmt.setString(3, address);
+                   pstmt.setString(4, zipCode);
+                   pstmt.setString(5, state);
+                   pstmt.setString(6, username);
+                   pstmt.setString(7, password);
+                   pstmt.setString(8, email);
+                   pstmt.setString(9, ssn);
+                   pstmt.setString(10, securityQuestion);
+                   // Update the UserType value
+                   pstmt.setString(11, userType);
+                   // Execute the insert statement
+                   pstmt.executeUpdate();
+               }
+           } catch (ClassNotFoundException | SQLException e) {
+               System.out.println(e.getMessage());
+           } finally {
+               try {
+                   if (conn != null) {
+                       System.out.println("Closing connection");
+                       conn.close();
+                   }
+               } catch (SQLException ex) {
+                   System.out.println(ex.getMessage());
+               }
+           }
+       }
+   }
+   private static class Customer extends User {
+       public Customer(String firstName, String lastName, String address, String zip, String state,
+                       String username, String password, String email, String ssn,
+                       String securityQuestion, String securityAnswer) {
+           super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+       }
+   }
+   private static class Admin extends User {
+       public Admin(String firstName, String lastName, String address, String zip, String state,
+                    String username, String password, String email, String ssn,
+                    String securityQuestion, String securityAnswer) {
+           super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+       }
+   }
+   private static Map<String, UserInterface> registeredUsers = new HashMap<>();
+   public static void main(String[] args) {
+       Scanner scanner = new Scanner(System.in);
+       // Registration
+       registerUser(scanner);
+       // Login
+       loginUser(scanner);
+       // Password Recovery
+       passwordRecovery(scanner);
+   }
+   protected static void registerUser(Scanner scanner) {
+       System.out.println("Registration:");
+       System.out.print("Enter First Name: ");
+       String firstName = scanner.nextLine();
+       System.out.print("Enter Last Name: ");
+       String lastName = scanner.nextLine();
+       System.out.print("Enter Address: ");
+       String address = scanner.nextLine();
+       System.out.print("Enter Zip Code: ");
+       String zipCode = scanner.nextLine();
+       System.out.print("Enter State: ");
+       String state = scanner.nextLine();
+       System.out.print("Enter Username: ");
+       String username = scanner.nextLine();
+       System.out.print("Enter Password: ");
+       String password = scanner.nextLine();
+       System.out.print("Enter Email: ");
+       String email = scanner.nextLine();
+       System.out.print("Enter SSN: ");
+       String ssn = scanner.nextLine();
+       System.out.print("Enter Security Question: ");
+       String securityQuestion = scanner.nextLine();
+       System.out.print("Enter Security Answer: ");
+       String securityAnswer = scanner.nextLine();
+       System.out.print("Is this a Customer or Admin account? (Enter 1 for Customer or 2 for Admin) ");
+       int choice2 = scanner.nextInt();
+       switch (choice2) {
+           case 1:
+               Customer newCustomer = new Customer(firstName, lastName, address, zipCode, state,
+                       username, password, email, ssn, securityQuestion, securityAnswer);
+               registeredUsers.put(username, newCustomer);
+               newCustomer.addToDatabase(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer, "Customer");
+               System.out.println("Registration Successful!");
+               break;
+           case 2:
+               Admin newAdmin = new Admin(firstName, lastName, address, zipCode, state,
+                       username, password, email, ssn, securityQuestion, securityAnswer);
+               registeredUsers.put(username, newAdmin);
+               newAdmin.addToDatabase(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer, "Admin");
+               System.out.println("Registration Successful!");
+               break;
+           default:
+               System.out.println("Invalid choice.");
+       }
+   }
+   protected static void loginUser(Scanner scanner) {
+       System.out.println("\nLogin:");
+       System.out.print("Enter Username: ");
+       String loginUsername = scanner.nextLine();
+       // Consume the newline character
+       scanner.nextLine();
+       if (registeredUsers.containsKey(loginUsername)) {
+           UserInterface user = registeredUsers.get(loginUsername);
+           System.out.print("Enter Password: ");
+           String loginPassword = scanner.nextLine();
+           if (user.getPassword().equals(loginPassword)) {
+               System.out.println("Login successful!");
+           } else {
+               System.out.println("Invalid password. Login failed.");
+           }
+       } else {
+           System.out.println("Username not found. Please register if you are not a member.");
+       }
+   }
+   protected static void passwordRecovery(Scanner scanner) {
+       System.out.println("\nPassword Recovery:");
+       System.out.print("Enter Username: ");
+       String recoveryUsername = scanner.nextLine();
+       if (registeredUsers.containsKey(recoveryUsername)) {
+           UserInterface user = registeredUsers.get(recoveryUsername);
+           System.out.println("Security Question: " + user.getSecurityQuestion());
+           System.out.print("Enter Security Answer: ");
+           String userPasswordRecoveryInput = scanner.nextLine();
+           if (user.getSecurityAnswer().equalsIgnoreCase(userPasswordRecoveryInput)) {
+               System.out.println("Your Password is: " + user.getPassword());
+           } else {
+               System.out.println("Invalid security answer. Password recovery failed.");
+           }
+       } else {
+           System.out.println("Username not found. Password recovery failed.");
+       }
+   }
+}
+
+
