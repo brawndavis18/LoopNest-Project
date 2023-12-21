@@ -1,0 +1,175 @@
+package funct_req_Brawn;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+
+public class RegistrationLoginRecoverySystem {
+    private interface UserInterface {
+        String getPassword();
+        String getSecurityQuestion();
+        String getSecurityAnswer();
+    }
+
+    private static class User implements UserInterface {
+        protected String password;
+        protected String securityQuestion;
+        protected String securityAnswer;
+
+        public User(String firstName, String lastName, String address, String zip, String state,
+                    String username, String password, String email, String ssn,
+                    String securityQuestion, String securityAnswer) {
+            this.password = password;
+            this.securityQuestion = securityQuestion;
+            this.securityAnswer = securityAnswer;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public String getSecurityQuestion() {
+            return securityQuestion;
+        }
+
+        public String getSecurityAnswer() {
+            return securityAnswer;
+        }
+    }
+
+    private static class Customer extends User {
+        public Customer(String firstName, String lastName, String address, String zip, String state,
+                        String username, String password, String email, String ssn,
+                        String securityQuestion, String securityAnswer) {
+            super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        }
+    }
+
+    private static class Admin extends User {
+        public Admin(String firstName, String lastName, String address, String zip, String state,
+                     String username, String password, String email, String ssn,
+                     String securityQuestion, String securityAnswer) {
+            super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        }
+    }
+
+    private static Map<String, UserInterface> registeredUsers = new HashMap<>();
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        // Registration
+        registerUser(scanner);
+
+        // Login
+        loginUser(scanner);
+
+        // Password Recovery
+        passwordRecovery(scanner);
+    }
+
+    protected static void registerUser(Scanner scanner) {
+        System.out.println("Registration:");
+
+        System.out.print("Enter First Name: ");
+        String firstName = scanner.nextLine();
+
+        System.out.print("Enter Last Name: ");
+        String lastName = scanner.nextLine();
+
+        System.out.print("Enter Address: ");
+        String address = scanner.nextLine();
+
+        System.out.print("Enter Zip Code: ");
+        String zip = scanner.nextLine();
+
+        System.out.print("Enter State: ");
+        String state = scanner.nextLine();
+
+        System.out.print("Enter Username: ");
+        String username = scanner.nextLine();
+
+        System.out.print("Enter Password: ");
+        String password = scanner.nextLine();
+
+        System.out.print("Enter Email: ");
+        String email = scanner.nextLine();
+
+        System.out.print("Enter SSN: ");
+        String ssn = scanner.nextLine();
+
+        System.out.print("Enter Security Question: ");
+        String securityQuestion = scanner.nextLine();
+
+        System.out.print("Enter Security Answer: ");
+        String securityAnswer = scanner.nextLine();
+
+        System.out.print("Is this a Customer or Admin account? (Enter 1 for Customer or 2 for Admin) ");
+        int choice2 = scanner.nextInt();
+
+        switch (choice2) {
+            case 1:
+                Customer newCustomer = new Customer(firstName, lastName, address, zip, state,
+                        username, password, email, ssn, securityQuestion, securityAnswer);
+                registeredUsers.put(username, newCustomer);
+                System.out.println("Registration Successful!");
+                break;
+            case 2:
+                Admin newAdmin = new Admin(firstName, lastName, address, zip, state,
+                        username, password, email, ssn, securityQuestion, securityAnswer);
+                registeredUsers.put(username, newAdmin);
+                System.out.println("Registration Successful!");
+                break;
+            default:
+                System.out.println("Invalid choice.");
+        }
+    }
+
+    protected static void loginUser(Scanner scanner) {
+        System.out.println("\nLogin:");
+
+        System.out.print("Enter Username: ");
+        String loginUsername = scanner.nextLine();
+
+     
+        if (registeredUsers.containsKey(loginUsername)) {
+            UserInterface user = registeredUsers.get(loginUsername);
+            System.out.print("Enter Password: ");
+            String loginPassword = scanner.nextLine();
+
+            if (user.getPassword().equals(loginPassword)) {
+                System.out.println("Login successful!");
+            } else {
+                System.out.println("Invalid password. Login failed.");
+            }
+
+        } else {
+            System.out.println("Username not found. Please register if you are not a member.");
+        }
+    }
+
+    protected static void passwordRecovery(Scanner scanner) {
+        System.out.println("\nPassword Recovery:");
+
+        System.out.print("Enter Username: ");
+        String recoveryUsername = scanner.nextLine();
+
+        if (registeredUsers.containsKey(recoveryUsername)) {
+            UserInterface user = registeredUsers.get(recoveryUsername);
+
+            System.out.println("Security Question: " + user.getSecurityQuestion());
+
+            System.out.print("Enter Security Answer: ");
+            String userPasswordRecoveryInput = scanner.nextLine();
+
+            if (user.getSecurityAnswer().equalsIgnoreCase(userPasswordRecoveryInput)) {
+                System.out.println("Your Password is: " + user.getPassword());
+            } else {
+                System.out.println("Invalid security answer. Password recovery failed.");
+            }
+        } else {
+            System.out.println("Username not found. Password recovery failed.");
+        }
+    }
+}
+
+
