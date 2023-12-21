@@ -1,0 +1,125 @@
+package funct_req_Brawn;
+
+import java.util.ArrayList;
+import java.util.List;
+
+class Flight {
+    private String fromCity;
+    private String toCity;
+    private String time;
+    private int capacity;
+    private int bookedPassengers;
+
+    public Flight(String fromCity, String toCity, String time, int capacity) {
+        this.fromCity = fromCity;
+        this.toCity = toCity;
+        this.time = time;
+        this.capacity = capacity;
+        this.bookedPassengers = 0;
+    }
+
+    // Getters and setters
+
+    public boolean isAvailable() {
+        return bookedPassengers < capacity;
+    }
+
+    public void book() {
+        if (isAvailable()) {
+            bookedPassengers++;
+        } else {
+            System.out.println("Flight is full. Cannot book.");
+        }
+    }
+
+    public void cancelBooking() {
+        if (bookedPassengers > 0) {
+            bookedPassengers--;
+        } else {
+            System.out.println("No booking to cancel.");
+        }
+    }
+}
+
+class User {
+    private String username;
+    private String password;
+
+    public User(String username, String password) {
+        this.username = username;
+        this.password = password;
+    }
+
+    // Getters and setters
+}
+
+class Customer extends User {
+    private List<Flight> bookedFlights;
+
+    public Customer(String username, String password) {
+        super(username, password);
+        this.bookedFlights = new ArrayList<>();
+    }
+
+    public void searchFlights(String fromCity, String toCity, String time) {
+        // Implement flight search logic
+    }
+
+    public void bookFlight(Flight flight) {
+        if (!bookedFlights.contains(flight) && flight.isAvailable()) {
+            bookedFlights.add(flight);
+            flight.book();
+        } else {
+            System.out.println("Cannot book the flight.");
+        }
+    }
+
+    public void cancelBooking(Flight flight) {
+        if (bookedFlights.contains(flight)) {
+            bookedFlights.remove(flight);
+            flight.cancelBooking();
+        } else {
+            System.out.println("No booking found for this flight.");
+        }
+    }
+}
+
+class Admin extends User {
+    public Admin(String username, String password) {
+        super(username, password);
+    }
+
+    public void addFlight(Flight flight) {
+        // Implement flight addition logic
+    }
+
+    public void updateFlight(Flight flight) {
+        // Implement flight update logic
+    }
+
+    public void deleteFlight(Flight flight) {
+        // Implement flight deletion logic
+    }
+}
+
+public class FlightBookingSystem {
+    public static void main(String[] args) {
+        // Example usage
+        Customer customer = new Customer("customer1", "password");
+        Admin admin = new Admin("admin", "adminpass");
+
+        Flight flight1 = new Flight("CityA", "CityB", "12:00", 100);
+        Flight flight2 = new Flight("CityB", "CityC", "14:00", 150);
+
+        // Customer operations
+        customer.searchFlights("CityA", "CityB", "12:00");
+        customer.bookFlight(flight1);
+        customer.bookFlight(flight1); // Trying to book the same flight again
+        customer.cancelBooking(flight2); // Trying to cancel a non-existent booking
+
+        // Admin operations
+        admin.addFlight(new Flight("CityC", "CityD", "16:00", 120));
+        admin.updateFlight(flight1);
+        admin.deleteFlight(flight2);
+    }
+}
