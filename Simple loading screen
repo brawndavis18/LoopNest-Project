@@ -1,0 +1,23 @@
+package funct_req_Brawn;
+
+// Class for the authentication application
+public class LoadingScreen {
+
+    // Main method to start the application
+    public static void main(String[] args) {
+        // Call the method to show the splash screen
+        showSplashScreen();
+    }
+
+    // Method to display the splash screen
+    protected static void showSplashScreen() {
+        // Display welcome message
+        System.out.println("Welcome to LoopNest!");
+
+        // Display loading message
+        System.out.println("Loading...");
+
+        // Print a blank line for formatting
+        System.out.println();
+    }
+}
