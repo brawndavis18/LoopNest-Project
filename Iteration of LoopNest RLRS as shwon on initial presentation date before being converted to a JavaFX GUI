@@ -1,0 +1,312 @@
+package funct_req_Brawn;
+
+
+
+import java.awt.HeadlessException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+
+public class LoopNestRLRS {
+    static Connection conn;
+
+    interface UserInterface {
+        String getPassword();
+        String getSecurityQuestion();
+        String getSecurityAnswer();
+
+        void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                           String username, String password, String email, String ssn,
+                           String securityQuestion, String securityAnswer, String userType);
+    }
+
+    private static class User implements UserInterface {
+        protected String password;
+        protected String securityQuestion;
+        protected String securityAnswer;
+
+        public User(String firstName, String lastName, String address, String zip, String state,
+                    String username, String password, String email, String ssn,
+                    String securityQuestion, String securityAnswer) {
+            this.password = password;
+            this.securityQuestion = securityQuestion;
+            this.securityAnswer = securityAnswer;
+            addToDatabase(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer, "User");
+        }
+        // Methods belonging to UserInterface
+        public String getPassword() {
+            return password;
+        }
+
+        public String getSecurityQuestion() {
+            return securityQuestion;
+        }
+
+        public String getSecurityAnswer() {
+            return securityAnswer;
+        }
+
+        @Override
+        public void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                                  String username, String password, String email, String ssn,
+                                  String securityQuestion, String securityAnswer, String userType) {
+            Connection conn = null;
+            try {
+                Class.forName("org.postgresql.Driver");
+                String url = "jdbc:postgresql://localhost:5432/LoopNest";
+                String user = "postgres";
+                String password1 = "bd199316";
+                conn = DriverManager.getConnection(url, user, password1);
+                conn.setAutoCommit(true);
+
+                String insertUserQuery = "INSERT INTO LoopNestUser (FirstName, LastName, Address, ZipCode, State, Username, Password, Email, SSN, SecurityQuestion, SecurityAnswer, UserType) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(insertUserQuery, PreparedStatement.RETURN_GENERATED_KEYS)) {
+                    pstmt.setString(1, firstName);
+                    pstmt.setString(2, lastName);
+                    pstmt.setString(3, address);
+                    pstmt.setString(4, zipCode);
+                    pstmt.setString(5, state);
+                    pstmt.setString(6, username);
+                    pstmt.setString(7, password);
+                    pstmt.setString(8, email);
+                    pstmt.setString(9, ssn);
+                    pstmt.setString(10, securityQuestion);
+                    pstmt.setString(11, securityAnswer);
+                    pstmt.setString(12, userType);
+
+                    pstmt.executeUpdate();
+
+                    registerUserHelper(conn, firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer, userType);
+                }
+            } catch (ClassNotFoundException | SQLException e) {
+                System.out.println(e.getMessage());
+            } finally {
+                try {
+                    if (conn != null) {
+                        System.out.println("Closing connection");
+                        conn.close();
+                    }
+                } catch (SQLException ex) {
+                    System.out.println(ex.getMessage());
+                }
+            }
+        }
+// Helper method, works in conjunction with registerUser()
+        private void registerUserHelper(Connection conn, String firstName, String lastName, String address, String zipCode, String state,
+                                        String username, String password, String email, String ssn,
+                                        String securityQuestion, String securityAnswer, String userType) {
+            try {
+                int userId = displayUserID(username);
+                if (userId != -1) {
+                    System.out.println("User ID: " + userId);
+                    System.out.println("Registration Successful!");
+                } else {
+                    System.out.println("Failed to retrieve user ID. User registration may not be successful.");
+                }
+            } catch (SQLException e) {
+                System.out.println(e.getMessage());
+            }
+        }
+    }
+// Admin and Custmomer subclasses
+    static class Customer extends User {
+        public Customer(String firstName, String lastName, String address, String zip, String state,
+                        String username, String password, String email, String ssn,
+                        String securityQuestion, String securityAnswer) {
+            super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        }
+    }
+
+    static class Admin extends User {
+        public Admin(String firstName, String lastName, String address, String zip, String state,
+                     String username, String password, String email, String ssn,
+                     String securityQuestion, String securityAnswer) {
+            super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        }
+    }
+
+    static Map<String, UserInterface> registeredUsers = new HashMap<>();
+
+    public static void main(String[] args) {
+        conn = initializeDatabaseConnection();
+        
+        SwingUtilities.invokeLater(() -> {
+            while (true) {
+                String[] options = {"Login", "Register", "Password Recovery", "Exit"};
+                int choice = JOptionPane.showOptionDialog(null, "Select an option:", "Main Menu",
+                        JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+                switch (choice) {
+                    case 0:
+                        loginUser();
+                        break;
+                    case 1:
+                        registerUser();
+                        break;
+                    case 2:
+                        passwordRecovery();
+                        break;
+                    case 3:
+                        System.exit(0);
+                }
+            }
+        });
+    }
+
+// Stores connection to LoopNestDB
+    protected static Connection initializeDatabaseConnection() {
+        Connection connection = null;
+        try {
+            Class.forName("org.postgresql.Driver");
+            String url = "jdbc:postgresql://localhost:5432/LoopNest";
+            String user = "postgres";
+            String password = "bd199316";
+            connection = DriverManager.getConnection(url, user, password);
+            connection.setAutoCommit(true);
+        } catch (ClassNotFoundException | SQLException e) {
+            e.printStackTrace();
+        }
+        return connection;
+    }
+// Prompts User for input for registration
+    protected static void registerUser() {
+        String username = null;
+		try {
+			System.out.println("Registration:");
+
+			String firstName = JOptionPane.showInputDialog("Enter First Name:");
+			String lastName = JOptionPane.showInputDialog("Enter Last Name:");
+			String address = JOptionPane.showInputDialog("Enter Address:");
+			String zipCode = JOptionPane.showInputDialog("Enter Zip Code:");
+			String state = JOptionPane.showInputDialog("Enter State:");
+			username = JOptionPane.showInputDialog("Enter Username:");
+			String password = JOptionPane.showInputDialog("Enter Password:");
+			String email = JOptionPane.showInputDialog("Enter Email:");
+			String ssn = JOptionPane.showInputDialog("Enter SSN:");
+			String securityQuestion = JOptionPane.showInputDialog("Enter Security Question:");
+			String securityAnswer = JOptionPane.showInputDialog("Enter Security Answer:");
+
+			String[] options = {"Customer", "Admin"};
+			int choice2 = JOptionPane.showOptionDialog(null, "Is this a Customer or Admin account?",
+			        "Account Type", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+			UserInterface newUser;
+
+			if (choice2 == 0) {
+			    newUser = new Customer(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer);
+			} else if (choice2 == 1) {
+			    newUser = new Admin(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer);
+			} else {
+			    JOptionPane.showMessageDialog(null, "Invalid choice. User registration failed.");
+			    return;
+			}
+// Adds User to both hashmap and DB
+			registeredUsers.put(username, newUser);
+			newUser.addToDatabase(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer, (choice2 == 0) ? "Customer" : "Admin");
+		} catch (HeadlessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+        try {
+            displayUserID(username);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        JOptionPane.showMessageDialog(null, "User registered successfully!");
+    }
+
+    protected static void loginUser() {
+        System.out.println("\nLogin:");
+        String loginUsername = JOptionPane.showInputDialog(null, "Enter Username:");
+        String loginPassword = JOptionPane.showInputDialog(null, "Enter Password:");
+
+        if (checkUserCredentials(loginUsername, loginPassword)) {
+            JOptionPane.showMessageDialog(null, "Login successful!");
+
+        } else {
+            JOptionPane.showMessageDialog(null, "Invalid username or password. Login failed.");
+        }
+    }
+
+    private static boolean checkUserCredentials(String username, String password) {
+        try {
+            String checkCredentialsQuery = "SELECT * FROM LoopNestUser WHERE Username = ? AND Password = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(checkCredentialsQuery)) {
+                pstmt.setString(1, username);
+                pstmt.setString(2, password);
+
+                try (ResultSet resultSet = pstmt.executeQuery()) {
+                    if (resultSet.next()) {
+                        return true;  // Credentials are correct
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error checking credentials: " + e.getMessage());
+        }
+        
+        return false;  // Credentials are incorrect or an error occurred
+    }
+
+
+    protected static void passwordRecovery() {
+        System.out.println("\nPassword Recovery:");
+        String recoveryUsername = JOptionPane.showInputDialog(null, "Enter Username:");
+
+        try {
+            String selectUserQuery = "SELECT Password, SecurityQuestion, SecurityAnswer FROM LoopNestUser WHERE Username = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(selectUserQuery)) {
+                pstmt.setString(1, recoveryUsername);
+
+                try (ResultSet resultSet = pstmt.executeQuery()) {
+                    if (resultSet.next()) {
+                        String storedPassword = resultSet.getString("Password");
+                        String storedSecurityQuestion = resultSet.getString("SecurityQuestion");
+                        String storedSecurityAnswer = resultSet.getString("SecurityAnswer");
+
+                        // Get user's response to security question
+                        String userAnswer = JOptionPane.showInputDialog(null, "Security Question: " + storedSecurityQuestion + "\nEnter Security Answer:");
+
+                        // Check if the provided security answer matches the stored answer
+                        if (storedSecurityAnswer.equalsIgnoreCase(userAnswer)) {
+                            JOptionPane.showMessageDialog(null, "Your Password is: " + storedPassword);
+                        } else {
+                            JOptionPane.showMessageDialog(null, "Invalid security answer. Password recovery failed.");
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Username not found. Password recovery failed.");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    private static int displayUserID(String username) throws SQLException {
+        int userId = -1;
+
+        String selectUserIdQuery = "SELECT UserID FROM LoopNestUser WHERE Username = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(selectUserIdQuery)) {
+            pstmt.setString(1, username);
+
+            try (ResultSet resultSet = pstmt.executeQuery()) {
+                if (resultSet.next()) {
+                    userId = resultSet.getInt("UserID");
+                    JOptionPane.showMessageDialog(null, "User ID: " + userId);
+                }
+            }
+        }
+
+        return userId;
+    }
+} 
