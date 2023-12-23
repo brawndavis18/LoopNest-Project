@@ -1,1 +1,99 @@
+package Project;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+
+public class RegistrationLoginRecoverySystem {
+
+    private static class User {
+        private String password;
+        private String securityQuestion;
+
+        public User(String firstName, String lastName, String address, String zip, String state,
+                    String username, String password, String email, String ssn, String securityQuestion) {
+            this.password = password;
+            this.securityQuestion = securityQuestion;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public String getSecurityQuestion() {
+            return securityQuestion;
+        }
+    }
+
+    private static Map<String, User> registeredUsers = new HashMap<>();
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        // Registration
+        System.out.println("Registration:");
+        System.out.print("Enter First Name: ");
+        String firstName = scanner.nextLine();
+        System.out.print("Enter Last Name: ");
+        String lastName = scanner.nextLine();
+        System.out.print("Enter Address: ");
+        String address = scanner.nextLine();
+        System.out.print("Enter Zip Code: ");
+        String zip = scanner.nextLine();
+        System.out.print("Enter State: ");
+        String state = scanner.nextLine();
+        System.out.print("Enter Username: ");
+        String username = scanner.nextLine();
+        System.out.print("Enter Password: ");
+        String password = scanner.nextLine();
+        System.out.print("Enter Email: ");
+        String email = scanner.nextLine();
+        System.out.print("Enter SSN: ");
+        String ssn = scanner.nextLine();
+        System.out.print("Enter Security Question: ");
+        String securityQuestion = scanner.nextLine();
+
+        User newUser = new User(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion);
+        registeredUsers.put(username, newUser);
+
+        System.out.println("Registration successful!");
+
+        // Login
+        System.out.println("\nLogin:");
+        System.out.print("Enter Username: ");
+        String loginUsername = scanner.nextLine();
+        System.out.print("Enter Password: ");
+        String loginPassword = scanner.nextLine();
+
+        if (registeredUsers.containsKey(loginUsername)) {
+            User user = registeredUsers.get(loginUsername);
+            if (user.getPassword().equals(loginPassword)) {
+                System.out.println("Login successful!");
+            } else {
+                System.out.println("Invalid password. Login failed.");
+            }
+        } else {
+            System.out.println("Username not found. Please register if you are not a member.");
+        }
+
+        // Password Recovery
+        System.out.println("\nPassword Recovery:");
+        System.out.print("Enter Username: ");
+        String recoveryUsername = scanner.nextLine();
+
+        if (registeredUsers.containsKey(recoveryUsername)) {
+            User user = registeredUsers.get(recoveryUsername);
+            System.out.println("Security Question: " + user.getSecurityQuestion());
+            System.out.print("Enter Security Answer: ");
+            String securityAnswer = scanner.nextLine();
+
+            if (user.getSecurityQuestion().equalsIgnoreCase(securityAnswer)) {
+                System.out.println("Your Password is: " + user.getPassword());
+            } else {
+                System.out.println("Invalid security answer. Password recovery failed.");
+            }
+        } else {
+            System.out.println("Username not found. Password recovery failed.");
+        }
+    }
+}
 
