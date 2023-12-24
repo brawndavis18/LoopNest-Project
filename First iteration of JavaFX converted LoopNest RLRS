@@ -1,0 +1,159 @@
+package LoopNestFX;
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.GridPane;
+import javafx.stage.Stage;
+import java.sql.*;
+public class LoopNestRLRSFX extends Application {
+   static Connection conn;
+   interface UserInterface {
+       String getPassword();
+       String getSecurityQuestion();
+       String getSecurityAnswer();
+       void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                          String username, String password, String email, String ssn,
+                          String securityQuestion, String securityAnswer, String userType);
+   }
+   private static class User implements UserInterface {
+       protected String password;
+       protected String securityQuestion;
+       protected String securityAnswer;
+       public User(String firstName, String lastName, String address, String zip, String state,
+                   String username, String password, String email, String ssn,
+                   String securityQuestion, String securityAnswer) {
+           this.password = password;
+           this.securityQuestion = securityQuestion;
+           this.securityAnswer = securityAnswer;
+           addToDatabase(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer, "User");
+       }
+       public String getPassword() {
+           return password;
+       }
+       public String getSecurityQuestion() {
+           return securityQuestion;
+       }
+       public String getSecurityAnswer() {
+           return securityAnswer;
+       }
+       @Override
+       public void addToDatabase(String firstName, String lastName, String address, String zipCode, String state,
+                                 String username, String password, String email, String ssn,
+                                 String securityQuestion, String securityAnswer, String userType) {
+           Connection conn = null;
+           try {
+               Class.forName("org.postgresql.Driver");
+               String url = "jdbc:postgresql://localhost:5432/LoopNest";
+               String user = "postgres";
+               String password1 = "bd199316";
+               conn = DriverManager.getConnection(url, user, password1);
+               conn.setAutoCommit(true);
+               String insertUserQuery = "INSERT INTO LoopNestUser (FirstName, LastName, Address, ZipCode, State, Username, Password, Email, SSN, SecurityQuestion, SecurityAnswer, UserType) " +
+                       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+               try (PreparedStatement pstmt = conn.prepareStatement(insertUserQuery, PreparedStatement.RETURN_GENERATED_KEYS)) {
+                   pstmt.setString(1, firstName);
+                   pstmt.setString(2, lastName);
+                   pstmt.setString(3, address);
+                   pstmt.setString(4, zipCode);
+                   pstmt.setString(5, state);
+                   pstmt.setString(6, username);
+                   pstmt.setString(7, password);
+                   pstmt.setString(8, email);
+                   pstmt.setString(9, ssn);
+                   pstmt.setString(10, securityQuestion);
+                   pstmt.setString(11, securityAnswer);
+                   pstmt.setString(12, userType);
+                   pstmt.executeUpdate();
+                   registerUserHelper(conn, firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer, userType);
+               }
+           } catch (ClassNotFoundException | SQLException e) {
+               System.out.println(e.getMessage());
+           } finally {
+               try {
+                   if (conn != null) {
+                       System.out.println("Closing connection");
+                       conn.close();
+                   }
+               } catch (SQLException ex) {
+                   System.out.println(ex.getMessage());
+               }
+           }
+       }
+// Helper method, works in conjunction with registerUser()
+       private void registerUserHelper(Connection conn, String firstName, String lastName, String address, String zipCode, String state,
+                                       String username, String password, String email, String ssn,
+                                       String securityQuestion, String securityAnswer, String userType) {
+           try {
+               int userId = displayUserID(username);
+               if (userId != -1) {
+                   System.out.println("User ID: " + userId);
+                   System.out.println("Registration Successful!");
+               } else {
+                   System.out.println("Failed to retrieve user ID. User registration may not be successful.");
+               }
+           } catch (SQLException e) {
+               System.out.println(e.getMessage());
+           }
+       }
+   }
+   static class Customer extends User {
+       public Customer(String firstName, String lastName, String address, String zip, String state,
+                       String username, String password, String email, String ssn,
+                       String securityQuestion, String securityAnswer) {
+           super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+       }
+   }
+   static class Admin extends User {
+       public Admin(String firstName, String lastName, String address, String zip, String state,
+                    String username, String password, String email, String ssn,
+                    String securityQuestion, String securityAnswer) {
+           super(firstName, lastName, address, zip, state, username, password, email, ssn, securityQuestion, securityAnswer);
+       }
+   }
+   static UserInterface newUser; // Used to store the registered user
+   public static void main(String[] args) {
+       launch(args);
+   }
+   @Override
+   public void start(Stage primaryStage) {
+       conn = initializeDatabaseConnection();
+       GridPane grid = new GridPane();
+       grid.setPadding(new Insets(10, 10, 10, 10));
+       grid.setVgap(8);
+       grid.setHgap(10);
+       while (true) {
+           Button loginButton = new Button("Login");
+           Button registerButton = new Button("Register");
+           Button recoveryButton = new Button("Password Recovery");
+           Button exitButton = new Button("Exit");
+           GridPane.setConstraints(loginButton, 1, 0);
+           GridPane.setConstraints(registerButton, 1, 1);
+           GridPane.setConstraints(recoveryButton, 1, 2);
+           GridPane.setConstraints(exitButton, 1, 3);
+           grid.getChildren().addAll(loginButton, registerButton, recoveryButton, exitButton);
+           loginButton.setOnAction(e -> loginUser());
+           registerButton.setOnAction(e -> registerUser());
+           recoveryButton.setOnAction(e -> passwordRecovery());
+           exitButton.setOnAction(e -> System.exit(0));
+           Scene scene = new Scene(grid, 300, 200);
+           primaryStage.setScene(scene);
+           primaryStage.setTitle("Main Menu");
+           primaryStage.showAndWait();
+       }
+   }
+// Stores connection to LoopNestDB
+   protected static Connection initializeDatabaseConnection() {
+       Connection connection = null;
+       try {
+           Class.forName("org.postgresql.Driver");
+           String url = "jdbc:postgresql://localhost:5432/LoopNest";
+           String user = "postgres";
+           String password = "bd199316";
+           connection = DriverManager.getConnection(url, user, password);
+           connection.setAutoCommit(true);
+       } catch (ClassNotFoundException | SQLException e) {
+           e.printStackTrace();
+       }
+       return connection;
+       }}
