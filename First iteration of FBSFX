@@ -1,0 +1,341 @@
+package LoopNestFX;
+import java.beans.Statement;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import javafx.application.Application;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
+import javafx.scene.Group;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+public class LoopNestFBSFX extends Application {
+   @Override
+   public void start(Stage primaryStage) {
+       displayFlightsFromDatabase();
+       createBookingGUI(primaryStage);
+   }
+// Establish a database connection
+   private static Connection establishConnection() throws SQLException, ClassNotFoundException {
+       Class.forName("org.postgresql.Driver");
+       String url = "jdbc:postgresql://localhost:5432/LoopNest";
+       String user = "postgres";
+       String password1 = "bd199316";
+       return DriverManager.getConnection(url, user, password1);
+   }
+  
+// Display flights from the database in a GUI
+   protected static void displayFlightsFromDatabase() {
+           try {
+               Class.forName("org.postgresql.Driver");
+               String url = "jdbc:postgresql://localhost:5432/LoopNest";
+               String user = "postgres";
+               String password1 = "bd199316";
+               try (Connection conn = DriverManager.getConnection(url, user, password1);
+                    PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM loopnestflight");
+                    ResultSet resultSet = pstmt.executeQuery()) {
+               TableView<ObservableList<String>> table = new TableView<>();
+               table.setEditable(false);
+               // Add columns dynamically based on the result set metadata
+               ResultSetMetaData metaData = resultSet.getMetaData();
+               for (int i = 1; i <= metaData.getColumnCount(); i++) {
+                   final int columnIndex = i - 1;
+                   TableColumn<ObservableList<String>, String> column = new TableColumn<>(metaData.getColumnName(i));
+                   column.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue().get(columnIndex)));
+                   table.getColumns().add(column);
+               }
+               // Add data to the table
+               while (resultSet.next()) {
+                   ObservableList<String> row = FXCollections.observableArrayList();
+                   for (int i = 1; i <= metaData.getColumnCount(); i++) {
+                       row.add(resultSet.getString(i));
+                   }
+                   table.getItems().add(row);
+               }
+               Stage stage = new Stage();
+               stage.setTitle("Flight Information");
+               Scene scene = new Scene(new Group(table), 600, 400);
+               stage.setScene(scene);
+               stage.show();
+           }
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+       }
+   }
+   private static void bookFlight(int userId, int flightId) {
+       try (Connection conn = establishConnection()) {
+           conn.setAutoCommit(true);
+           if (!hasUserBookedFlight(conn, userId, flightId)) {
+               if (isFlightAvailable(conn, flightId, flightId)) {
+                   // SQL query to insert a booking and update the flight's current passengers
+                   String insertBookingQuery = "WITH inserted_booking AS ( " +
+                           "   INSERT INTO loopnestbooking (UserID, FlightID, FormattedBookingDateTime) VALUES (?, ?, ?) " +
+                           "   RETURNING FlightID " +
+                           ") " +
+                           "UPDATE loopnestflight " +
+                           "SET CurrentPassengers = CurrentPassengers + 1 " +
+                           "WHERE FlightID = (SELECT FlightID FROM inserted_booking)";
+                   try (PreparedStatement pstmt = conn.prepareStatement(insertBookingQuery)) {
+                       pstmt.setInt(1, userId);
+                       pstmt.setInt(2, flightId);
+                       pstmt.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
+                       pstmt.executeUpdate();
+                       showAlert("Booking successful!", Alert.AlertType.INFORMATION);
+                   }
+               } else {
+                   showAlert("Flight is not available for booking.", Alert.AlertType.WARNING);
+               }
+           } else {
+               showAlert("You have already booked this flight.", Alert.AlertType.WARNING);
+           }
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+       }
+   }
+   private static void showAlert(String message, Alert.AlertType alertType) {
+       Alert alert = new Alert(alertType);
+       alert.setTitle("Booking System");
+       alert.setHeaderText(null);
+       alert.setContentText(message);
+       alert.showAndWait();
+   }
+   // Check if a user has booked a specific flight
+   private static boolean hasUserBookedFlight(Connection conn, int userId, int flightId) throws SQLException {
+       String checkBookingQuery = "SELECT * FROM loopnestbooking WHERE UserID = ? AND FlightID = ?";
+       try (PreparedStatement pstmt = conn.prepareStatement(checkBookingQuery)) {
+           pstmt.setInt(1, userId);
+           pstmt.setInt(2, flightId);
+           try (ResultSet resultSet = pstmt.executeQuery()) {
+               return resultSet.next();
+           }
+       }
+   }
+   // Check if a flight is available for booking
+   private static boolean isFlightAvailable(Connection conn, int userId, int flightId) throws SQLException {
+       // Set the time window (in milliseconds) within which two flights are considered too close
+       long timeWindowMillis = 60 * 60 * 1000; // 1 hour
+       // Retrieve the departure time and capacity of the selected flight
+       String getSelectedFlightInfoQuery = "SELECT DepartureDateTime, CurrentPassengers, MaxPassengers FROM loopnestflight WHERE FlightID = ?";
+       Timestamp selectedFlightDepartureTime;
+       int currentPassengers;
+       int maxPassengers;
+       try (PreparedStatement infoStmt = conn.prepareStatement(getSelectedFlightInfoQuery)) {
+           infoStmt.setInt(1, flightId);
+           try (ResultSet infoResultSet = infoStmt.executeQuery()) {
+               if (infoResultSet.next()) {
+                   selectedFlightDepartureTime = infoResultSet.getTimestamp("DepartureDateTime");
+                   currentPassengers = infoResultSet.getInt("CurrentPassengers");
+                   maxPassengers = infoResultSet.getInt("MaxPassengers");
+               } else {
+                   // Flight not found
+                   return false;
+               }
+           }
+       }
+       // Check if there are any booked flights for the user within the specified time window
+       String checkAvailabilityQuery = "SELECT * FROM loopnestbooking b " +
+               "INNER JOIN loopnestflight f ON b.FlightID = f.FlightID " +
+               "WHERE b.UserID = ? AND ABS(EXTRACT(EPOCH FROM f.DepartureDateTime - ?)) < ?";
+       // Check if the selected flight is at capacity
+       boolean isAtCapacity = currentPassengers >= maxPassengers;
+       try (PreparedStatement pstmt = conn.prepareStatement(checkAvailabilityQuery)) {
+           pstmt.setInt(1, userId);
+           pstmt.setTimestamp(2, selectedFlightDepartureTime);
+           pstmt.setLong(3, timeWindowMillis);
+           try (ResultSet resultSet = pstmt.executeQuery()) {
+               // If there is a flight within the time window or the selected flight is at capacity, return false
+               return !resultSet.next() && !isAtCapacity;
+           }
+       }
+   }
+   // Delete a booked flight for a user
+   private static void deleteBookedFlight(int userId, int flightId) {
+       try (Connection conn = establishConnection()) {
+           conn.setAutoCommit(true);
+           if (isFlightBooked(conn, userId, flightId)) {
+               // SQL query to delete a booking and update the flight's current passengers
+               String deleteBookingQuery = "WITH deleted_booking AS ( " +
+                       "   DELETE FROM loopnestbooking WHERE UserID = ? AND FlightID = ? " +
+                       "   RETURNING FlightID " +
+                       ") " +
+                       "UPDATE loopnestflight " +
+                       "SET CurrentPassengers = CurrentPassengers - 1 " +
+                       "WHERE FlightID = (SELECT FlightID FROM deleted_booking)";
+               try (PreparedStatement pstmt = conn.prepareStatement(deleteBookingQuery)) {
+                   pstmt.setInt(1, userId);
+                   pstmt.setInt(2, flightId);
+                   pstmt.executeUpdate();
+                   showAlert("Booking deleted successfully!", Alert.AlertType.INFORMATION);
+               }
+           } else {
+               showAlert("No booking found for the specified user and flight.", Alert.AlertType.WARNING);
+           }
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+       }
+   }
+  
+   // Check if a user has booked a specific flight
+   private static boolean isFlightBooked(Connection conn, int userId, int flightId) throws SQLException {
+       String checkBookingQuery = "SELECT * FROM loopnestbooking WHERE UserID = ? AND FlightID = ?";
+       try (PreparedStatement pstmt = conn.prepareStatement(checkBookingQuery)) {
+           pstmt.setInt(1, userId);
+           pstmt.setInt(2, flightId);
+           try (ResultSet resultSet = pstmt.executeQuery()) {
+               return resultSet.next();
+           }
+       }
+   }
+   // View booked flights for a user
+   private static void viewBookedFlights(int userId) {
+       Connection conn = null;
+       try {
+           conn = establishConnection();
+           // Do not set auto-commit to true to control when to commit manually
+           conn.setAutoCommit(false);
+           String selectBookedFlightsQuery = "SELECT * FROM loopnestbooking " +
+                   "INNER JOIN loopnestflight ON loopnestbooking.FlightID = loopnestflight.FlightID " +
+                   "WHERE LoopNestBooking.UserID = ?";
+           try (PreparedStatement pstmt = conn.prepareStatement(selectBookedFlightsQuery)) {
+               pstmt.setInt(1, userId);
+               try (ResultSet resultSet = pstmt.executeQuery()) {
+                   TableView<BookedFlight> table = createBookedFlightsTable(resultSet);
+                   // Create a VBox to hold the TableView
+                   VBox vbox = new VBox(table);
+                   vbox.setPadding(new Insets(10));
+                   // Create a new stage to display the TableView
+                   Stage stage = new Stage();
+                   stage.setTitle("Booked Flights");
+                   stage.setScene(new Scene(vbox, 600, 400));
+                   stage.showAndWait();  // Show the stage and wait for it to be closed
+               }
+           }
+           // Commit changes after reading data to ensure consistency
+           conn.commit();
+       } catch (ClassNotFoundException | SQLException e) {
+           System.out.println(e.getMessage());
+           try {
+               if (conn != null) {
+                   // Rollback changes in case of an exception
+                   conn.rollback();
+               }
+           } catch (SQLException ex) {
+               System.out.println(ex.getMessage());
+           }
+       } finally {
+           try {
+               if (conn != null) {
+                   System.out.println("Closing connection");
+                   conn.close();
+               }
+           } catch (SQLException ex) {
+               System.out.println(ex.getMessage());
+           }
+       }
+   }
+   private static TableView<BookedFlight> createBookedFlightsTable(ResultSet resultSet) throws SQLException {
+       TableView<BookedFlight> table = new TableView<>();
+       table.setEditable(false);
+       // Define columns
+       TableColumn<BookedFlight, String> flightIdCol = new TableColumn<>("Flight ID");
+       flightIdCol.setCellValueFactory(new PropertyValueFactory<>("flightId"));
+       TableColumn<BookedFlight, String> departureTimeCol = new TableColumn<>("Departure Time");
+       departureTimeCol.setCellValueFactory(new PropertyValueFactory<>("departureTime"));
+       // Add columns to the TableView
+       table.getColumns().addAll(flightIdCol, departureTimeCol);
+       // Add data to the table
+       ObservableList<BookedFlight> data = FXCollections.observableArrayList();
+       while (resultSet.next()) {
+           int flightId = resultSet.getInt("FlightID");
+           Timestamp departureTime = resultSet.getTimestamp("DepartureDateTime");
+           data.add(new BookedFlight(flightId, departureTime));
+       }
+       table.setItems(data);
+       return table;
+   }
+   // Define a class to represent a booked flight
+  public static class BookedFlight {
+       private final int flightId;
+       private final Timestamp departureTime;
+       public BookedFlight(int flightId, Timestamp departureTime) {
+           this.flightId = flightId;
+           this.departureTime = departureTime;
+       }
+       public int getFlightId() {
+           return flightId;
+       }
+       public String getDepartureTime() {
+           // You may want to format the timestamp as a string
+           return departureTime.toString();
+       }
+   }
+   // Create the booking GUI
+   static void createBookingGUI(Stage primaryStage) {
+       primaryStage.setTitle("Booking System");
+       GridPane gridPane = new GridPane();
+       gridPane.setPadding(new Insets(10, 10, 10, 10));
+       gridPane.setVgap(8);
+       gridPane.setHgap(10);
+       TextField userIdTextFieldBook = new TextField();
+       TextField flightIdTextFieldBook = new TextField();
+       TextField userIdTextFieldDelete = new TextField();
+       TextField flightIdTextFieldDelete = new TextField();
+       TextField userIdTextFieldView = new TextField();
+       Button bookButton = new Button("Book Flight");
+       Button deleteButton = new Button("Cancel Flight");
+       Button viewButton = new Button("View Booked Flights");
+       Button backButton = new Button("Back to Main Menu");
+       bookButton.setOnAction(e -> {
+           int userId = Integer.parseInt(userIdTextFieldBook.getText());
+           int flightId = Integer.parseInt(flightIdTextFieldBook.getText());
+           bookFlight(userId, flightId);
+       });
+       deleteButton.setOnAction(e -> {
+           int userId = Integer.parseInt(userIdTextFieldDelete.getText());
+           int flightId = Integer.parseInt(flightIdTextFieldDelete.getText());
+           deleteBookedFlight(userId, flightId);
+       });
+       viewButton.setOnAction(e -> {
+           int userId = Integer.parseInt(userIdTextFieldView.getText());
+           viewBookedFlights(userId);
+       });
+       backButton.setOnAction(e -> {
+           // Call the showMainMenu method from FlightBookingWithAuthenticationApp
+           // (Assuming there's a class named IntegratedLoopNestApp with a showMainMenu method)
+           // IntegratedLoopNestApp.showMainMenu();
+           // Close the booking window
+           primaryStage.close();
+       });
+       // Panel Formatting
+       gridPane.add(new Label("User ID:"), 0, 0);
+       gridPane.add(userIdTextFieldBook, 1, 0);
+       gridPane.add(new Label("Flight ID:"), 0, 1);
+       gridPane.add(flightIdTextFieldBook, 1, 1);
+       gridPane.add(bookButton, 2, 1);
+       gridPane.add(new Label("User ID:"), 0, 2);
+       gridPane.add(userIdTextFieldDelete, 1, 2);
+       gridPane.add(new Label("Flight ID:"), 0, 3);
+       gridPane.add(flightIdTextFieldDelete, 1, 3);
+       gridPane.add(deleteButton, 2, 3);
+       gridPane.add(new Label("User ID:"), 0, 4);
+       gridPane.add(userIdTextFieldView, 1, 4);
+       gridPane.add(viewButton, 2, 4);
+       // Setting layout and adding panels to the scene
+       Scene scene = new Scene(gridPane, 400, 400);
+       primaryStage.setScene(scene);
+       primaryStage.show();
+   }
+   public static void main(String[] args) {
+       launch(args);
+   }
+}
