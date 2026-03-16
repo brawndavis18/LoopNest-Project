@@ -1,0 +1,226 @@
+package funct_req_Brawn;
+
+import javax.swing.*;
+import funct_req_Brawn.LoopNestRLRS.Admin;
+import funct_req_Brawn.LoopNestRLRS.Customer;
+import funct_req_Brawn.LoopNestRLRS.UserInterface;
+
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.*;
+import java.util.HashMap;
+import java.util.Map;
+
+public class IntegratedLoopNestApp {
+
+    private static Connection conn;
+    private static Map<String, UserInterface> registeredUsers = new HashMap<>();
+
+    public static void main(String[] args) {
+        conn = initializeDatabaseConnection();
+
+        SwingUtilities.invokeLater(() -> {
+            showSplashScreen();
+            // Delay to simulate loading 
+            Timer timer = new Timer(3000, new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    closeSplashScreen();
+                    showMainMenu();
+                }
+            });
+            timer.setRepeats(false);
+            timer.start();
+        });
+    }
+    // Splash Scene GUI Configuration
+    private static void showSplashScreen() {
+        JFrame splashFrame = new JFrame("Splash Screen");
+        JLabel splashLabel = new JLabel("Welcome to LoopNest!\nLoading...");
+        splashLabel.setHorizontalAlignment(JLabel.CENTER);
+        splashFrame.getContentPane().add(splashLabel, BorderLayout.CENTER);
+        splashFrame.setSize(300, 200);
+        splashFrame.setLocationRelativeTo(null); // Center the splash screen
+        splashFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        splashFrame.setVisible(true);
+    }
+    // Method to close Splash screen
+    private static void closeSplashScreen() {
+        // Close the splash screen window
+        Window[] windows = Window.getWindows();
+        for (Window window : windows) {
+            if (window instanceof JFrame) {
+                window.dispose();
+            }
+        }
+    }
+
+    static void showMainMenu() {
+        String[] options = {"Login", "Register", "Password Recovery", "Exit"};
+        int choice = JOptionPane.showOptionDialog(
+                null, "Select an option:", "Main Menu",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+        switch (choice) {
+            case 0:
+                loginUser();
+                break;
+            case 1:
+                registerUser();
+                break;
+            case 2:
+                passwordRecovery();
+                break;
+            case 3:
+                System.exit(0);
+        }
+    }
+    private static void registerUser() {
+        String firstName = JOptionPane.showInputDialog("Enter First Name:");
+        String lastName = JOptionPane.showInputDialog("Enter Last Name:");
+        String address = JOptionPane.showInputDialog("Enter Address:");
+        String zipCode = JOptionPane.showInputDialog("Enter Zip Code:");
+        String state = JOptionPane.showInputDialog("Enter State:");
+        String username = JOptionPane.showInputDialog("Enter Username:");
+        String password = JOptionPane.showInputDialog("Enter Password:");
+        String email = JOptionPane.showInputDialog("Enter Email:");
+        String ssn = JOptionPane.showInputDialog("Enter SSN:");
+        String securityQuestion = JOptionPane.showInputDialog("Enter Security Question:");
+        String securityAnswer = JOptionPane.showInputDialog("Enter Security Answer:");
+
+        String[] options = {"Customer", "Admin"};
+        int choice2 = JOptionPane.showOptionDialog(null, "Is this a Customer or Admin account?",
+                "Account Type", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+        UserInterface newUser;
+
+        if (choice2 == 0) {
+            newUser = new Customer(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        } else if (choice2 == 1) {
+            newUser = new Admin(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer);
+        } else {
+            JOptionPane.showMessageDialog(null, "Invalid choice. User registration failed.");
+            return;
+        }
+
+        registeredUsers.put(username, newUser);
+        newUser.addToDatabase(firstName, lastName, address, zipCode, state, username, password, email, ssn, securityQuestion, securityAnswer, (choice2 == 0) ? "Customer" : "Admin");
+
+        try {
+            displayUserID(username);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        JOptionPane.showMessageDialog(null, "User registered successfully!");
+
+        // Display flights and create booking GUI after successful registration
+        LoopNestFBS.displayFlightsFromDatabase();
+        LoopNestFBS.createBookingGUI();
+    }
+
+    private static void loginUser() {
+        System.out.println("\nLogin:");
+        String loginUsername = JOptionPane.showInputDialog(null, "Enter Username:");
+        String loginPassword = JOptionPane.showInputDialog(null, "Enter Password:");
+
+        if (checkUserCredentials(loginUsername, loginPassword)) {
+            JOptionPane.showMessageDialog(null, "Login successful!");
+
+            // Display flights and create booking GUI after successful login
+            LoopNestFBS.displayFlightsFromDatabase();
+            LoopNestFBS.createBookingGUI();
+
+        } else {
+            JOptionPane.showMessageDialog(null, "Invalid username or password. Login failed.");
+        }
+    }
+
+    private static boolean checkUserCredentials(String username, String password) {
+        try {
+            String checkCredentialsQuery = "SELECT * FROM LoopNestUser WHERE Username = ? AND Password = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(checkCredentialsQuery)) {
+                pstmt.setString(1, username);
+                pstmt.setString(2, password);
+
+                try (ResultSet resultSet = pstmt.executeQuery()) {
+                    if (resultSet.next()) {
+                        return true;  // Credentials are correct
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error checking credentials: " + e.getMessage());
+        }
+
+        return false;  // Credentials are incorrect or an error occurred
+    }
+
+    private static void passwordRecovery() {
+        System.out.println("\nPassword Recovery:");
+        String recoveryUsername = JOptionPane.showInputDialog(null, "Enter Username:");
+
+        try {
+            String selectUserQuery = "SELECT Password, SecurityQuestion, SecurityAnswer FROM LoopNestUser WHERE Username = ?";
+            try (PreparedStatement pstmt = conn.prepareStatement(selectUserQuery)) {
+                pstmt.setString(1, recoveryUsername);
+
+                try (ResultSet resultSet = pstmt.executeQuery()) {
+                    if (resultSet.next()) {
+                        String storedPassword = resultSet.getString("Password");
+                        String storedSecurityQuestion = resultSet.getString("SecurityQuestion");
+                        String storedSecurityAnswer = resultSet.getString("SecurityAnswer");
+
+                        // Get user's response to security question
+                        String userAnswer = JOptionPane.showInputDialog(null, "Security Question: " + storedSecurityQuestion + "\nEnter Security Answer:");
+
+                        // Check if the provided security answer matches the stored answer
+                        if (storedSecurityAnswer.equalsIgnoreCase(userAnswer)) {
+                            JOptionPane.showMessageDialog(null, "Your Password is: " + storedPassword);
+                        } else {
+                            JOptionPane.showMessageDialog(null, "Invalid security answer. Password recovery failed.");
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Username not found. Password recovery failed.");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    private static int displayUserID(String username) throws SQLException {
+        int userId = 0;
+
+        String selectUserIdQuery = "SELECT UserID FROM LoopNestUser WHERE Username = ?";
+        try (PreparedStatement pstmt = conn.prepareStatement(selectUserIdQuery)) {
+            pstmt.setString(1, username);
+
+            try (ResultSet resultSet = pstmt.executeQuery()) {
+                if (resultSet.next()) {
+                    userId = resultSet.getInt("UserID");
+                    JOptionPane.showMessageDialog(null, "User ID: " + userId);
+                }
+            }
+        }
+
+        return userId;
+    }
+
+    protected static Connection initializeDatabaseConnection() {
+        Connection connection = null;
+        try {
+            Class.forName("org.postgresql.Driver");
+            String url = "jdbc:postgresql://localhost:5432/LoopNest";
+            String user = "postgres";
+            String password = "bd199316";
+            connection = DriverManager.getConnection(url, user, password);
+            connection.setAutoCommit(true);
+        } catch (ClassNotFoundException | SQLException e) {
+            e.printStackTrace();
+        }
+        return connection;
+    }
+}
