@@ -1,0 +1,51 @@
+package LoopNestFX;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.layout.BorderPane;
+import javafx.stage.Stage;
+
+public class LoadingScreenFX extends Application {
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        showSplashScreen(primaryStage);
+
+        // Simulate some loading task in the background
+        new Thread(() -> {
+            try {
+                // Simulate a loading delay
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // Close the splash screen after loading is complete
+            Platform.runLater(() -> closeSplashScreen(primaryStage));
+        }).start();
+    }
+
+    protected static void showSplashScreen(Stage primaryStage) {
+        BorderPane splashPane = new BorderPane();
+        Label splashLabel = new Label("Welcome to LoopNest!\nLoading...");
+        splashLabel.setStyle("-fx-font-size: 16;");
+        splashLabel.setStyle("-fx-font-weight: bold;");
+        splashPane.setCenter(splashLabel);
+
+        Scene splashScene = new Scene(splashPane, 300, 200);
+        primaryStage.setScene(splashScene);
+        primaryStage.setTitle("Splash Screen");
+        primaryStage.centerOnScreen();
+        primaryStage.show();
+    }
+
+    protected static void closeSplashScreen(Stage primaryStage) {
+        primaryStage.close();
+    }
+}

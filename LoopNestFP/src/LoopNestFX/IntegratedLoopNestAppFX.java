@@ -1,0 +1,74 @@
+package LoopNestFX;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.stage.Stage;
+
+import java.util.Optional;
+
+
+public class IntegratedLoopNestAppFX extends Application {
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        // Initialize the database connection
+        LoopNestRLRSFX.conn = LoopNestRLRSFX.initializeDatabaseConnection();
+        LoadingScreenFX.showSplashScreen(primaryStage);
+
+        // Simulate some loading task in the background
+        new Thread(() -> {
+            try {
+                // Simulate a loading delay
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            // Close the splash screen after loading is complete
+            Platform.runLater(() -> {
+                LoadingScreenFX.closeSplashScreen(primaryStage);
+                // Open the main menu after closing the splash screen
+                showMainMenu(primaryStage);
+            });
+        }).start();
+    }
+
+
+
+
+    private static void showMainMenu(Stage primaryStage) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Main Menu");
+        alert.setHeaderText("Select an option:");
+        alert.setContentText("Choose your option:");
+
+        ButtonType loginButton = new ButtonType("Login");
+        ButtonType registerButton = new ButtonType("Register");
+        ButtonType recoveryButton = new ButtonType("Password Recovery");
+        ButtonType exitButton = new ButtonType("Exit");
+
+        alert.getButtonTypes().setAll(loginButton, registerButton, recoveryButton, exitButton);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent()) {
+            if (result.get() == loginButton) {
+                LoopNestRLRSFX.loginUser();
+                // Display flights and create booking GUI after successful login
+                LoopNestFBSFX.displayFlightsFromDatabase();
+                LoopNestFBSFX.createBookingGUI(primaryStage);
+            } else if (result.get() == registerButton) {
+                LoopNestRLRSFX.registerUser(primaryStage);
+            } else if (result.get() == recoveryButton) {
+                LoopNestRLRSFX.passwordRecovery();
+            } else if (result.get() == exitButton) {
+                System.exit(0);
+            }
+        }
+    }
+}
